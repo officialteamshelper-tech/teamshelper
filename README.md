@@ -18,7 +18,6 @@ Core capabilities included in this package:
 - **Manual and scheduled modes:** use direct manual status control or let the weekly timeline drive changes.
 - **Diagnostics:** review schedule history, copy logs, refresh runtime/package data, and send feedback from the extension UI.
 - **Cloud-backed settings:** sync supported settings and subscription/beta access state through the Teams Helper runtime endpoints.
-- **No build step:** the repository contains the packaged Manifest V3 extension files ready to load unpacked in Chrome or Edge.
 
 ## Project details
 
@@ -52,4 +51,3 @@ Core capabilities included in this package:
 5. Choose **Load unpacked**.
 6. Select the extracted `teams-helper-extension-github-upload` folder.
 
-No build step is required for the packaged extension files in this repository.
