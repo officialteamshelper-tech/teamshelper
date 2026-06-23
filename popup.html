@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<meta content="dark" name="color-scheme"/>
+<meta content="#090a0c" name="theme-color"/>
+<title>Teams Helper</title>
+<link href="popup.css" rel="stylesheet"/>
+</head>
+<body>
+<main aria-label="Teams Helper sign in" class="popup flow-screen" id="loginScreen">
+<header class="flow-topbar">
+<div aria-hidden="true" class="logo-tile">TH</div>
+<p class="brand-name">Teams Helper</p>
+<span class="flow-step">1 / 3</span>
+</header>
+<section class="flow-content">
+<div class="flow-kicker" id="flowAuthKicker">Account access</div>
+<h1 class="flow-title" id="flowAuthTitle">Welcome back.</h1>
+<p class="flow-copy" id="flowAuthCopy">Sign in securely to discover your Teams accounts and manage presence schedules.</p>
+<form class="flow-form" id="flowLoginForm" novalidate="">
+<label class="flow-input-shell">
+<span aria-hidden="true" class="flow-input-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" viewbox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+<input aria-label="Username or email" autocomplete="username" id="flowIdentity" placeholder="Username or email"/>
+<span aria-hidden="true"></span>
+</label>
+<label class="flow-input-shell">
+<span aria-hidden="true" class="flow-input-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" viewbox="0 0 24 24"><rect height="10" rx="2" width="14" x="5" y="10"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span>
+<input aria-label="Password" autocomplete="current-password" id="flowPassword" placeholder="Password" type="password"/>
+<button aria-label="Show password" class="flow-input-action" id="flowPasswordToggle" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" viewbox="0 0 24 24"><path d="M2.5 12C4.8 8.1 8 6 12 6s7.2 2.1 9.5 6c-2.3 3.9-5.5 6-9.5 6s-7.2-2.1-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg></button>
+</label>
+<div class="flow-captcha" hidden="" id="flowCaptchaPanel">
+<div class="flow-captcha-head"><strong>Security check</strong><button class="flow-text-button" id="flowCaptchaRefresh" type="button">New image</button></div>
+<img alt="Security code image" class="flow-captcha-image" height="76" id="flowCaptchaImage" width="252"/>
+<label class="flow-input-shell flow-captcha-input-shell">
+<span aria-hidden="true" class="flow-input-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" viewbox="0 0 24 24"><path d="M4 7h16v10H4z"></path><path d="M8 10h2m2 0h2m2 0h1M8 14h1m2 0h2m2 0h2"></path></svg></span>
+<input aria-label="Security code" autocomplete="off" autocapitalize="characters" class="flow-captcha-input" id="flowCaptchaInput" maxlength="6" placeholder="6-character code" spellcheck="false"/>
+<span aria-hidden="true"></span>
+</label>
+<input id="flowCaptchaId" type="hidden"/>
+</div>
+<div class="flow-meta">
+<label class="flow-check"><input checked="" id="flowRemember" type="checkbox"/> Remember me</label>
+<button class="flow-text-button" id="flowForgot" type="button">Forgot password?</button>
+</div>
+<button class="flow-primary" id="flowLoginSubmit" type="submit">Log in <span aria-hidden="true">→</span></button>
+<button class="flow-text-button" id="flowEmailLink" type="button">Email sign-in link</button>
+<div class="flow-divider">or</div>
+<button class="flow-secondary" id="flowGoogle" type="button"><span aria-hidden="true">G</span> Continue with Google</button>
+<button class="flow-secondary" id="flowCreate" type="button">Create account</button>
+<div aria-live="polite" class="flow-status" id="flowLoginStatus"></div>
+</form>
+</section>
+<footer class="flow-footer"><a class="community-link" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank">Discord ↗</a><a data-legal-doc="privacy" href="https://home.officialteamshelper.workers.dev/privacy" rel="noreferrer" target="_blank">Privacy</a><a data-legal-doc="terms" href="https://home.officialteamshelper.workers.dev/terms" rel="noreferrer" target="_blank">Terms</a></footer>
+</main><main aria-label="Teams Helper access options" class="popup flow-screen" hidden="" id="accessScreen">
+<header class="flow-topbar">
+<button aria-label="Back to sign in" class="flow-back" id="accessBack" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg></button>
+<div aria-hidden="true" class="logo-tile">TH</div>
+<p class="brand-name">Teams Helper</p>
+<span class="flow-step">2 / 3</span>
+</header>
+<section class="flow-content">
+<div class="flow-kicker">Access</div>
+<h1 class="flow-title" id="flowAccessTitle">Choose access.</h1>
+<p class="flow-copy" id="flowAccessCopy">Select how this account should enter the Teams Helper control center.</p>
+<div class="flow-account-hint" id="flowAccessIdentity">Signed in account</div>
+<form class="flow-form" id="flowAccessForm">
+<div class="flow-pending-beta" id="flowPendingBeta" hidden="">
+<span class="flow-pending-beta-label">Pending beta request</span>
+<strong>Your beta request is waiting for review.</strong>
+<p>You can keep waiting for approval or buy a subscription for immediate access.</p>
+</div>
+<label class="flow-beta-note" id="flowBetaNoteField"><span>Beta use case <small>(optional)</small></span><textarea id="flowBetaNote" maxlength="500" placeholder="How you plan to use Teams Helper" rows="3"></textarea></label>
+<div class="flow-plans">
+<label class="flow-plan" id="flowBetaPlan">
+<input checked="" name="flowPlan" type="radio" value="beta"/>
+<span aria-hidden="true" class="flow-radio"></span>
+<span><span class="flow-plan-title">Beta</span><span class="flow-plan-copy">Early access while testing continues.</span></span>
+<span class="flow-price">Free</span>
+</label>
+<label class="flow-plan" id="flowSubscriptionPlan">
+<input name="flowPlan" type="radio" value="subscription"/>
+<span aria-hidden="true" class="flow-radio"></span>
+<span><span class="flow-plan-title">Subscription</span><span class="flow-plan-copy">Ongoing access and cloud-backed settings.</span></span>
+<span class="flow-price">Plans</span>
+</label>
+</div>
+<div aria-label="Billing period" class="flow-billing" id="flowBilling">
+<button class="active" data-flow-period="monthly" type="button">Monthly</button>
+<button data-flow-period="annual" type="button">Annual</button>
+</div>
+<button class="flow-primary" id="flowAccessSubmit" type="submit">Continue <span aria-hidden="true">→</span></button>
+</form>
+<div aria-live="polite" class="flow-status" id="flowAccessStatus"></div></section>
+<footer class="flow-footer"><span>Access can be changed later in cloud settings.</span><a class="community-link" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank">Discord ↗</a></footer>
+</main><main aria-label="Teams Helper account discovery" class="popup flow-screen" hidden="" id="discoveryScreen">
+<header class="flow-topbar">
+<div aria-hidden="true" class="logo-tile">TH</div>
+<p class="brand-name">Teams Helper</p>
+<span class="flow-step">3 / 3</span>
+</header>
+<section class="flow-content">
+<div class="flow-kicker">Account discovery</div>
+<h1 class="flow-title">Finding accounts.</h1>
+<p class="flow-copy" id="flowDiscoveryCopy">Checking signed-in Teams sessions directly in the background. No Teams tab is required.</p>
+<div class="flow-discovery-list" id="flowDiscoveryList"><div class="flow-discovery-placeholder" id="flowDiscoveryPlaceholder">Waiting for account discovery…</div></div>
+<div aria-hidden="true" class="flow-progress" id="flowDiscoveryProgress"><span></span></div>
+<div aria-live="polite" class="flow-status" id="flowDiscoveryStatus">Ready to scan.</div>
+<button class="flow-primary" disabled="" id="flowOpenControl" type="button">Open control center</button>
+</section>
+<footer class="flow-footer"><span>Accounts remain separate and can use different presence modes.</span><a class="community-link" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank">Discord ↗</a></footer>
+</main><main aria-label="Teams Helper account discovery and weekly schedule editor" class="popup flow-screen" hidden="" id="appScreen">
+<header class="topbar">
+<div aria-hidden="true" class="logo-tile">TH</div>
+<p class="brand-name">Teams Helper</p>
+<a aria-label="Join Teams Helper Discord" class="icon-button discord-button" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank" title="Join Discord">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M7.2 7.2A12.2 12.2 0 0 1 12 6c1.7 0 3.3.4 4.8 1.2 1.1 1.8 1.8 3.8 2 5.9-1.5 1.4-3.2 2.3-5.1 2.7l-1.1-1.5"></path><path d="M16.8 7.2A12.2 12.2 0 0 0 12 6c-1.7 0-3.3.4-4.8 1.2-1.1 1.8-1.8 3.8-2 5.9 1.5 1.4 3.2 2.3 5.1 2.7l1.1-1.5"></path><circle cx="9.3" cy="11.5" fill="currentColor" r=".8" stroke="none"></circle><circle cx="14.7" cy="11.5" fill="currentColor" r=".8" stroke="none"></circle></svg>
+</a>
+<button aria-checked="true" aria-label="No Seen on" class="icon-button no-seen-button" id="noSeenToggle" role="switch" title="No Seen on" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 3l18 18"></path><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.2 0 8.7 4.6 9.6 6-.4.7-1.5 2.2-3.2 3.5"></path><path d="M6.2 6.2C4.2 7.5 2.9 9.4 2.4 10c.9 1.4 4.4 6 9.6 6 1 0 1.9-.2 2.7-.5"></path></svg>
+</button>
+<button aria-label="Find accounts again" class="icon-button" id="refreshBtn" title="Find accounts again" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 11M4 13l2.3 4.6A7 7 0 0 0 17.9 15"></path></svg>
+</button><button aria-label="Open settings and diagnostics" class="icon-button" id="settingsBtn" title="Settings and diagnostics" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path></svg></button>
+</header>
+<section class="content">
+<div class="discovery-head">
+<h1>Accounts</h1>
+<span class="count" id="accountCount">0 confirmed</span>
+</div>
+<div class="accounts" id="accountsList"><div class="accounts-empty" id="accountsEmpty">No signed-in Teams account has been identified yet.</div></div>
+<section aria-labelledby="scheduleTitle" class="schedule-section" id="scheduleSection">
+<div class="schedule-head">
+<h2 id="scheduleTitle">Weekly timeline</h2>
+<span class="save-state" id="saveState">Waiting for state</span>
+</div>
+<div class="schedule-controls">
+<label class="day-picker">
+<span class="sr-only">Schedule day</span>
+<select aria-label="Schedule day" id="daySelect">
+<option value="mon">Monday</option>
+<option value="tue">Tuesday</option>
+<option value="wed">Wednesday</option>
+<option value="thu">Thursday</option>
+<option value="fri">Friday</option>
+<option value="sat">Saturday</option>
+<option value="sun">Sunday</option>
+</select>
+</label>
+<button class="tool-button" id="addBtn" type="button">+ Block</button>
+<details class="timeline-menu" id="timelineMenu">
+<summary aria-label="Timeline options" title="Timeline options">•••</summary>
+<div class="timeline-menu-popover">
+<label class="zoom-control"><span>Zoom</span><input id="zoomRange" max="4" min="0" step="1" type="range"/></label>
+<button class="tool-button" id="fitBtn" type="button">Fit 24 hours</button>
+</div>
+</details>
+</div>
+<div class="timeline-shell">
+<div aria-hidden="true" class="timeline-labels" id="timelineLabels">
+<div class="axis-label">Time</div>
+</div>
+<div class="timeline-scroll" id="timelineScroll">
+<div class="timeline-grid editing" id="timelineGrid">
+<div class="axis-track" id="axisTrack"></div>
+</div>
+</div>
+</div>
+<div class="selection-readout" id="selectionReadout"><span>Select a block</span><strong>0 selected</strong></div>
+<details class="editor-panel" id="editorPanel">
+<summary class="editor-disclosure">
+<span><strong>Selected block</strong><small id="editorSummary">Select a block to edit</small></span>
+<span aria-hidden="true" class="editor-chevron">⌄</span>
+</summary>
+<div class="editor-body">
+<div class="editor-head">
+<button aria-label="Delete selected block" class="editor-delete" id="deleteBtn" title="Delete selected block" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m7 7 1 13h8l1-13"></path></svg>
+</button>
+</div>
+<div class="editor-grid">
+<label class="field"><span>Account</span><select id="accountField"><option value="">No account</option></select></label>
+<label class="field"><span>Status</span><select id="statusField"><option value="available">Available</option><option value="busy">Busy</option><option value="dnd">Do not disturb</option><option value="brb">Be right back</option><option value="away">Away</option><option value="offline">Appear offline</option></select></label>
+<label class="field field-time"><span>Start</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" id="startFieldButton" type="button"><span class="time-field-value" id="startFieldDisplay">09:00 AM</span><span class="time-field-action">Choose</span></button><input aria-hidden="true" class="time-value-input" id="startField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
+<label class="field field-time"><span>End</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" id="endFieldButton" type="button"><span class="time-field-value" id="endFieldDisplay">10:00 AM</span><span class="time-field-action">Choose</span></button><input aria-hidden="true" class="time-value-input" id="endField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
+<label class="field"><div class="field-head"><span>Priority</span><strong id="priorityValue">0</strong></div><input id="priorityField" max="50" min="0" step="1" type="range" value="0"/></label>
+<label class="check-field"><input id="callsField" type="checkbox"/> Allow during calls</label>
+<label class="field full"><span>Note</span><input id="noteField" maxlength="80" placeholder="Optional note" type="text"/></label>
+</div>
+<div class="editor-footer"><span>Drag blocks across accounts; resize either edge.</span><span id="blockCount">0 total blocks</span></div>
+</div>
+</details>
+</section>
+</section>
+<footer class="footer">
+<button class="footer-action" id="footerFaq" type="button">FAQ</button>
+<button class="flow-signout" id="flowSignOut" type="button">Sign out</button>
+<a class="community-link" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank">Discord ↗</a>
+<a data-cloud-settings="true" href="https://home.officialteamshelper.workers.dev/" rel="noopener noreferrer" target="_blank">Cloud settings ↗</a>
+</footer>
+</main><div aria-live="polite" class="app-toast" hidden="" id="appToast" role="status"></div>
+<div class="block-menu app-context-menu" hidden="" id="appContextMenu" role="menu">
+<div class="block-menu-header" id="appMenuHeader">Teams Helper</div>
+<button class="block-menu-action" hidden="" id="appMenuAddBlock" role="menuitem" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg><span>Add block here</span></button>
+<button class="block-menu-action danger" hidden="" id="appMenuRemoveBlock" role="menuitem" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m7 7 1 13h8l1-13"></path></svg><span>Remove block</span></button>
+<button class="block-menu-action danger" hidden="" id="appMenuRemoveAccount" role="menuitem" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m7 7 1 13h8l1-13"></path></svg><span>Remove account</span></button>
+<div aria-hidden="true" class="block-menu-separator" hidden="" id="appMenuContextSeparator"></div>
+<button class="block-menu-action" hidden="" id="appMenuSettings" role="menuitem" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"></path></svg><span>Settings and diagnostics</span></button><button class="block-menu-action" id="appMenuFaq" role="menuitem" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M9.8 9a2.3 2.3 0 1 1 3.8 1.8c-.9.7-1.6 1.1-1.6 2.2"></path><path d="M12 16h.01"></path></svg>
+<span>Open FAQ</span>
+</button>
+<a class="block-menu-action" href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" role="menuitem" target="_blank">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M7.2 7.2A12.2 12.2 0 0 1 12 6c1.7 0 3.3.4 4.8 1.2 1.1 1.8 1.8 3.8 2 5.9-1.5 1.4-3.2 2.3-5.1 2.7l-1.1-1.5"></path><path d="M16.8 7.2A12.2 12.2 0 0 0 12 6c-1.7 0-3.3.4-4.8 1.2-1.1 1.8-1.8 3.8-2 5.9 1.5 1.4 3.2 2.3 5.1 2.7l1.1-1.5"></path></svg>
+<span>Join Discord</span>
+</a>
+<a class="block-menu-action" data-cloud-settings="true" hidden="" href="https://home.officialteamshelper.workers.dev/" id="appMenuCloud" rel="noopener noreferrer" role="menuitem" target="_blank">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M14 5h5v5"></path><path d="m13 11 6-6"></path><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"></path></svg>
+<span>Cloud settings</span>
+</a>
+<div class="block-menu-hint" id="appMenuHint">Right-click anywhere for Teams Helper actions.</div>
+</div>
+<div class="block-menu note-context-menu" hidden="" id="noteContextMenu" role="menu">
+<div class="block-menu-header">Note</div>
+<button class="block-menu-action" hidden="" id="noteMenuCopy" role="menuitem" type="button"><span>Copy selected text</span></button>
+<button class="block-menu-action" hidden="" id="noteMenuPaste" role="menuitem" type="button"><span>Paste</span></button>
+<div class="block-menu-hint" id="noteMenuHint">Select text to copy.</div>
+</div>
+<dialog aria-describedby="accountRemoveDescription" aria-labelledby="accountRemoveTitle" class="account-remove-dialog" id="accountRemoveDialog">
+<div class="account-remove-panel">
+<div class="account-remove-titlebar"><span id="accountRemoveTitle">Remove account?</span></div>
+<div class="account-remove-body">
+<div aria-hidden="true" class="account-remove-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m7 7 1 13h8l1-13"></path></svg></div>
+<div class="account-remove-copy">
+<p>Remove <strong id="accountRemoveName">this account</strong> from Teams Helper?</p>
+<div class="account-remove-identity" id="accountRemoveIdentity">Teams account</div>
+<p class="account-remove-description" id="accountRemoveDescription">Its schedules and manual settings will be removed. The account can be discovered and added again later.</p>
+</div>
+</div>
+<div class="account-remove-actions">
+<button class="account-remove-button" id="accountRemoveCancel" type="button">Cancel</button>
+<button class="account-remove-button danger" id="accountRemoveConfirm" type="button">Remove account</button>
+</div>
+</div>
+</dialog>
+<dialog aria-labelledby="faqTitle" class="faq-dialog" id="faqDialog">
+<div class="faq-titlebar"><span id="faqTitle">Teams Helper FAQ</span><button aria-label="Close FAQ" class="faq-close" id="faqClose" type="button">×</button></div>
+<div class="faq-body">
+<p class="faq-intro">Quick answers for schedules, manual control, privacy, and multiple Teams accounts.</p>
+<details class="faq-item" open=""><summary>How do Schedule and Manual work?</summary><div class="faq-answer">Schedule changes your status automatically based on your saved times. Manual lets you choose a status yourself until you switch back to Schedule.</div></details>
+<details class="faq-item"><summary>Can each account use different settings?</summary><div class="faq-answer">Yes. Each account can use its own status, mode, and schedule.</div></details>
+<details class="faq-item"><summary>How precise can schedule blocks be?</summary><div class="faq-answer">Schedule blocks can be moved, resized, and edited to match the times you need.</div></details>
+<details class="faq-item"><summary>What does priority do?</summary><div class="faq-answer">Priority decides which schedule block is used when two blocks overlap.</div></details>
+<details class="faq-item"><summary>What is No Seen?</summary><div class="faq-answer">No Seen helps prevent other people from seeing that you have read their messages. Toggle it before entering a chat with someone.</div></details>
+<details class="faq-item"><summary>Where can I get help or share feedback?</summary><div class="faq-answer">Join the Teams Helper Discord for help, feedback, and updates.</div></details>
+<div class="faq-actions"><a data-legal-doc="privacy" href="https://home.officialteamshelper.workers.dev/privacy" rel="noreferrer" target="_blank">Privacy</a><a data-legal-doc="terms" href="https://home.officialteamshelper.workers.dev/terms" rel="noreferrer" target="_blank">Terms</a><a href="https://status-goblin-hq.officialteamshelper.workers.dev/join" rel="noopener noreferrer" target="_blank">Join Discord ↗</a><a data-cloud-settings="true" href="https://home.officialteamshelper.workers.dev/" rel="noopener noreferrer" target="_blank">Cloud settings ↗</a></div>
+</div>
+
+
+
+
+
+
+
+
+</dialog><dialog aria-labelledby="legalTitle" class="faq-dialog legal-dialog" id="legalDialog">
+<div class="faq-titlebar"><span id="legalTitle">Teams Helper legal</span><button aria-label="Close legal document" class="faq-close" id="legalClose" type="button">×</button></div>
+<div class="faq-body legal-body">
+<div aria-label="Choose legal document" class="legal-toolbar" role="group">
+<button aria-pressed="true" class="legal-tab" data-legal-tab="privacy" id="legalPrivacyTab" type="button">Privacy</button>
+<button aria-pressed="false" class="legal-tab" data-legal-tab="terms" id="legalTermsTab" type="button">Terms</button>
+<button aria-label="Refresh live document" class="legal-refresh" id="legalRefresh" title="Refresh live document" type="button">↻</button>
+</div>
+<p aria-live="polite" class="faq-intro legal-status" id="legalStatus">Choose a document to load the current published copy.</p>
+<div class="legal-content" id="legalContent"></div>
+<div class="faq-actions legal-actions"><a href="https://home.officialteamshelper.workers.dev/privacy" id="legalOpenExternal" rel="noopener noreferrer" target="_blank">Open published page ↗</a></div>
+</div>
+</dialog><dialog aria-labelledby="settingsTitle" class="faq-dialog settings-dialog" id="settingsDialog">
+<div class="faq-titlebar"><span id="settingsTitle">Teams Helper settings</span><button aria-label="Close settings" class="faq-close" id="settingsClose" type="button">×</button></div>
+<div class="faq-body settings-body">
+<section class="settings-group">
+<h3>Runtime</h3>
+<label class="settings-toggle"><input id="settingsCloudToggle" type="checkbox"/> <span>Global Cloud Edit sync</span></label>
+<label class="settings-toggle"><input id="settingsAutoSessionToggle" type="checkbox"/> <span>Allow schedules while Teams is closed</span></label>
+<div class="settings-inline"><label for="settingsPollInterval">Cloud refresh</label><input id="settingsPollInterval" max="600" min="15" step="1" type="number" value="30"/><span>sec</span><button class="tool-button" id="settingsPollSave" type="button">Save</button></div>
+<div aria-live="polite" class="flow-status" id="settingsStatus"></div>
+</section>
+<section class="settings-group">
+<h3>Teams and access</h3>
+<div class="settings-actions">
+<button aria-hidden="true" class="tool-button" hidden id="settingsOpenPanel" tabindex="-1" type="button">Open Teams panel</button>
+<button class="tool-button" id="settingsReloadTeams" type="button">Reload Teams</button>
+<button class="tool-button" id="settingsIntegrityRefresh" type="button">Refresh package cache</button>
+<button class="tool-button" id="settingsManageBilling" type="button">Manage billing</button>
+</div>
+<div aria-live="polite" class="settings-package-status" id="settingsPackageStatus">Manifest cache status not loaded.</div>
+</section>
+<section class="settings-group">
+<div class="settings-group-head"><h3>Beta feedback</h3><span id="settingsFeedbackCount">0 / 600</span></div>
+<textarea class="settings-log settings-feedback" id="settingsFeedbackText" maxlength="600" placeholder="Tell us what worked, what broke, or what should improve." rows="4"></textarea>
+<label class="settings-toggle"><input id="settingsFeedbackAttachLogs" type="checkbox"/> <span>Attach schedule history</span></label>
+<div class="settings-actions"><button class="tool-button" id="settingsFeedbackSend" type="button">Send feedback</button><button class="tool-button" id="settingsFeedbackSendLogs" type="button">Send history</button></div>
+<div aria-live="polite" class="flow-status" id="settingsFeedbackStatus"></div>
+</section>
+<section class="settings-group">
+<div class="settings-group-head"><h3>Schedule history</h3><span id="settingsLogMeta">No entries loaded</span></div>
+<div class="settings-log-shell" id="settingsLogShell"><textarea class="settings-log" id="settingsLogViewer" readonly="" spellcheck="false">No schedule updates loaded yet.</textarea></div>
+<div class="settings-actions three">
+<button class="tool-button" id="settingsLogRefresh" type="button">Refresh</button>
+<button class="tool-button" id="settingsLogCopy" type="button">Copy</button>
+<button class="tool-button" id="settingsLogClear" type="button">Clear</button>
+</div>
+</section>
+</div>
+</dialog>
+<div aria-label="Set block time" class="time-picker" hidden="" id="timePicker" role="dialog">
+<div class="time-picker-frame">
+<div class="time-picker-head"><span class="time-picker-kicker" id="timePickerTitle">Start time</span><strong class="time-picker-preview" id="timePickerPreview">09:00 AM</strong></div>
+<div class="time-picker-columns">
+<section class="time-picker-column"><span class="time-picker-column-title">Hour</span><div class="time-picker-scroll-host"><div class="time-picker-scroll" id="timePickerHours" role="listbox"></div></div></section>
+<section class="time-picker-column"><span class="time-picker-column-title">Minute</span><div class="time-picker-scroll-host"><div class="time-picker-scroll" id="timePickerMinutes" role="listbox"></div></div></section>
+<section class="time-picker-column time-picker-meridiem"><span class="time-picker-column-title">Period</span><div class="time-picker-scroll-host"><div class="time-picker-scroll" id="timePickerMeridiem" role="listbox"></div></div></section>
+</div>
+<div class="time-picker-hint">Click outside to apply · Esc to cancel</div>
+</div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>
