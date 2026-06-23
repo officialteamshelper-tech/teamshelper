@@ -42,36 +42,6 @@ Core capabilities included in this package:
   - `account_bootstrap.js`, `account_inventory.js`
   - `assets/`
 
-## Repository description for GitHub
-
-GitHub’s short repository description is edited on the repository page after upload. Use this text:
-
-```text
-Chrome/Edge extension for Microsoft Teams presence scheduling, manual status control, account management, diagnostics, and cloud-backed settings.
-```
-
-Suggested GitHub topics:
-
-```text
-chrome-extension edge-extension manifest-v3 microsoft-teams teams-helper presence-scheduling productivity
-```
-
-## Upload to GitHub using only the website
-
-1. Extract the ZIP file you downloaded from ChatGPT.
-2. Create a new empty GitHub repository in your browser.
-   - Do not initialize it with a README, license, or `.gitignore`; this package already includes the repo files.
-3. Open the new repository page on GitHub.
-4. Choose **Add file** → **Upload files**.
-5. Open the extracted `teams-helper-extension-github-upload` folder on your computer.
-6. Drag everything inside that folder into the GitHub upload page:
-   - `manifest.json`
-   - all `.js`, `.html`, `.css`, `.json`, and image files
-   - the `assets/` folder
-   - this `README.md`
-7. Commit the upload in GitHub's web interface.
-
-Do not upload the outer ZIP file as a single file unless you intentionally want the repository to contain only an archive. GitHub's normal web upload page stores the files you drag onto it; it does not unpack a ZIP file into repository contents for you.
 
 ## Load locally as an unpacked extension
 
