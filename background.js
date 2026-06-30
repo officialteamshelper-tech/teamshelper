@@ -1582,6 +1582,9 @@ try { importScripts("account_bootstrap.js"); } catch (error) { console.error("[T
     if (Object.prototype.hasOwnProperty.call(values, "refreshSession")) update[REFRESH_SESSION_KEY] = values.refreshSession || null;
     if (Object.prototype.hasOwnProperty.call(values, "policy")) update[POLICY_KEY] = normalizePolicy(values.policy);
     await storageSet(update);
+    if (Object.prototype.hasOwnProperty.call(values, "session")) {
+      try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = !(values.session && values.session.token); } catch {}
+    }
     if (Object.prototype.hasOwnProperty.call(values, "session") || Object.prototype.hasOwnProperty.call(values, "refreshSession") || Object.prototype.hasOwnProperty.call(values, "policy")) {
       await getRegisteredUserScope(true, "auth-state-saved").catch(() => null);
     }
@@ -2780,10 +2783,46 @@ try { importScripts("account_bootstrap.js"); } catch (error) { console.error("[T
     }
   }
 
+  async function teardownRuntimeForExtensionSignOut(reason = "extension-sign-out") {
+    const reasonText = String(reason || "extension-sign-out");
+    try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = true; } catch {}
+    try {
+      if (typeof globalThis.TeamsHelperRuntimeLogoutTeardown === "function") {
+        return await globalThis.TeamsHelperRuntimeLogoutTeardown(reasonText);
+      }
+    } catch {}
+    try {
+      if (typeof globalThis.TeamsHelperResetRegisteredUserRuntimeState === "function") {
+        await globalThis.TeamsHelperResetRegisteredUserRuntimeState("signed-out", "extension-sign-out", Date.now(), reasonText);
+      }
+    } catch {}
+    try {
+      const fallbackAlarms = [
+        "th_mv3_keepalive_alarm",
+        "th_status_reassert_30s",
+        "th_status_hard_reassert_60s_v214",
+        "th_tabless_session_maintainer",
+        "th_tabless_session_maintainer_3m_v226",
+        "th_tabless_session_maintainer_3m",
+        "th_tabless_session_maintainer_60s"
+      ];
+      for (const alarmName of fallbackAlarms) {
+        if (alarmName && chrome.alarms && chrome.alarms.clear) await chrome.alarms.clear(alarmName).catch(() => null);
+      }
+    } catch {}
+    try {
+      if (chrome.offscreen && typeof chrome.offscreen.closeDocument === "function") await chrome.offscreen.closeDocument().catch(() => null);
+    } catch {}
+    return { ok: true, reason: reasonText, fallback: true };
+  }
+
   async function signOut() {
+    try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = true; } catch {}
     await clearPendingEmailLinkAuth();
+    await teardownRuntimeForExtensionSignOut("extension-sign-out-before-state-clear").catch(() => null);
     await storageRemove([PROTECTION_KEY]).catch(() => null);
     await saveState({ session: null, refreshSession: null, policy: normalizePolicy({ entitlement: "none", reason: "signed-out" }) });
+    await teardownRuntimeForExtensionSignOut("extension-sign-out-after-state-clear").catch(() => null);
     await reloadTeamsTabs();
     return true;
   }
@@ -3015,6 +3054,10 @@ try { importScripts("account_bootstrap.js"); } catch (error) { console.error("[T
     getRuntimePolicy,
     refreshEntitlement,
     getStatus,
+    isSignedInLocal: async function isSignedInLocal() {
+      const { session } = await loadState();
+      return !!(session && session.token);
+    },
     syncPageEnabledFlag: async function syncPageEnabledFlag() {
       const { policy } = await loadState();
       return { enabled: hasEntitlement(policy) };
@@ -5062,6 +5105,7 @@ async function bgEnsureAfkScheduleReassertAlarm(state = null) {
 
 async function bgHandleAfkScheduleReassert(reason = "afk-reassert") {
   th147MarkScheduleEditPayload(arguments && arguments[0], "schedule-function-entry");
+    if (typeof globalThis.TeamsHelperRuntimeSignedInForPresence === "function" && !(await globalThis.TeamsHelperRuntimeSignedInForPresence(reason || "afk-reassert"))) return { ok: true, skipped: true, reason: "extension-signed-out" };
     await bgScheduleStatusLog("debug", "AFK schedule reassert tick", { reason });
     let state = await m().catch(() => h(null));
     state = h(state || null, state && state.tabId);
@@ -7797,6 +7841,7 @@ let bgCloudSyncWriteChain = Promise.resolve(false),
 
 async function bgResetRegisteredUserRuntimeState(nextScope, previousScope, generation, reason = "registered-user-changed") {
     const next = String(nextScope || "signed-out").trim().toLowerCase() || "signed-out";
+    try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = next === "signed-out"; } catch {}
     try { if (bgPresenceForceTimer) clearTimeout(bgPresenceForceTimer) } catch {}
     bgPresenceForceTimer = null;
     bgPresenceForcePromise = null;
@@ -7880,6 +7925,9 @@ async function bgResetRegisteredUserRuntimeState(nextScope, previousScope, gener
             if (alarmName) await chrome.alarms.clear(alarmName).catch(() => null)
         }
     } catch {}
+    if (next === "signed-out") {
+        try { await bgClearRuntimeLogoutOwners(reason || "registered-user-signed-out") } catch {}
+    }
     try {
         await bgScheduleStatusLog("info", "Teams Helper registered-user runtime scope changed", {
             previousScope: previousScope || null,
@@ -7891,7 +7939,113 @@ async function bgResetRegisteredUserRuntimeState(nextScope, previousScope, gener
     return true
 }
 
+function bgRuntimeLogoutAlarmNames() {
+    const names = [
+        bgPresenceForceAlarmName,
+        bgScheduleAlarmName,
+        bgScheduleHeartbeatAlarmName,
+        bgScheduleAfkReassertAlarmName,
+        bgCloudPollAlarmName,
+        "th_mv3_keepalive_alarm",
+        "th_status_reassert_30s",
+        "th_status_hard_reassert_60s_v214",
+        bgStorageKeys && bgStorageKeys.tablessSessionMaintainer || "th_tabless_session_maintainer",
+        bgStorageKeys && bgStorageKeys.tablessSessionMaintainerLegacy || "th_tabless_session_maintainer_3m_v226",
+        "th_tabless_session_maintainer_3m",
+        "th_tabless_session_maintainer_60s"
+    ];
+    return Array.from(new Set(names.filter(Boolean).map(name => String(name))))
+}
+
+async function bgClearRuntimeLogoutOwners(reason = "runtime-logout") {
+    try {
+        for (const alarmName of bgRuntimeLogoutAlarmNames()) {
+            try { if (chrome.alarms && chrome.alarms.clear) await chrome.alarms.clear(alarmName).catch(() => null) } catch {}
+        }
+    } catch {}
+    try {
+        if (chrome.offscreen && typeof chrome.offscreen.closeDocument === "function") await chrome.offscreen.closeDocument().catch(() => null);
+    } catch {}
+    try {
+        const keys = [
+            bgPresenceForceQueueKey,
+            bgStorageKeys && bgStorageKeys.tablessSessionMaintainerState || "th_tabless_session_maintainer_state",
+            "th_keepalive_touch",
+            "th_keepalive_ping",
+            "th_presence_heartbeat",
+            "th_presence_message",
+            "th_status_reassert_last_tick",
+            "th_status_reassert_source",
+            "th_presence_write_suppression_reset_at",
+            "th_presence_write_suppression_reset_reason"
+        ].filter(Boolean);
+        await i().remove(keys).catch(() => null);
+        await bgDurableRuntimeStorage().remove(keys).catch(() => null);
+    } catch {}
+    return { ok: true, reason: String(reason || "runtime-logout") }
+}
+
+let bgRuntimeLogoutTeardownInFlight = null;
+
+async function bgRuntimeHasSignedInExtensionSessionLocal() {
+    try {
+        const license = globalThis.TeamsHelperLicense;
+        if (license && typeof license.isSignedInLocal === "function") return !!(await license.isSignedInLocal());
+        if (license && typeof license.getStatus === "function") {
+            const status = await license.getStatus(false);
+            return !!(status && status.session && status.session.token);
+        }
+    } catch {}
+    return false
+}
+
+async function bgRuntimeSignedInForPresence(reason = "runtime-guard") {
+    if (globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ === true) {
+        await bgTeardownRuntimeForLogout(String(reason || "runtime-guard") + "-signed-out-flag").catch(() => null);
+        return false
+    }
+    if (globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ === true) {
+        await bgTeardownTeamsWebSessionRuntime(String(reason || "runtime-guard") + "-teams-web-session-offline").catch(() => null);
+        return false
+    }
+    const signedIn = await bgRuntimeHasSignedInExtensionSessionLocal().catch(() => false);
+    if (!signedIn) {
+        await bgTeardownRuntimeForLogout(String(reason || "runtime-guard") + "-no-extension-session").catch(() => null);
+        return false
+    }
+    try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = false; } catch {}
+    return true
+}
+
+async function bgTeardownRuntimeForLogout(reason = "extension-sign-out") {
+    const reasonText = String(reason || "extension-sign-out");
+    try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = true; } catch {}
+    if (bgRuntimeLogoutTeardownInFlight) return bgRuntimeLogoutTeardownInFlight;
+    bgRuntimeLogoutTeardownInFlight = (async () => {
+        const previous = typeof bgCurrentRegisteredUserScopeSync === "function" ? bgCurrentRegisteredUserScopeSync() : "signed-out";
+        await bgResetRegisteredUserRuntimeState("signed-out", previous, Date.now(), reasonText).catch(() => null);
+        await bgClearRuntimeLogoutOwners(reasonText).catch(() => null);
+        return { ok: true, reason: reasonText, previousScope: previous || null }
+    })().finally(() => { bgRuntimeLogoutTeardownInFlight = null; });
+    return bgRuntimeLogoutTeardownInFlight
+}
+
+async function bgTeardownTeamsWebSessionRuntime(reason = "teams-web-session-signed-out") {
+    const reasonText = String(reason || "teams-web-session-signed-out");
+    try { globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ = true; } catch {}
+    const scope = typeof bgCurrentRegisteredUserScopeSync === "function" ? bgCurrentRegisteredUserScopeSync() : "signed-out";
+    await bgResetRegisteredUserRuntimeState(scope || "signed-out", scope || null, Date.now(), reasonText).catch(() => null);
+    if (scope && scope !== "signed-out") {
+        try { globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ = false; } catch {}
+    }
+    await bgClearRuntimeLogoutOwners(reasonText).catch(() => null);
+    return { ok: true, reason: reasonText, scope: scope || null }
+}
+
 globalThis.TeamsHelperResetRegisteredUserRuntimeState = bgResetRegisteredUserRuntimeState;
+globalThis.TeamsHelperRuntimeLogoutTeardown = bgTeardownRuntimeForLogout;
+globalThis.TeamsHelperTeamsWebSessionTeardown = bgTeardownTeamsWebSessionRuntime;
+globalThis.TeamsHelperRuntimeSignedInForPresence = bgRuntimeSignedInForPresence;
 globalThis.TeamsHelperRegisteredUserScopeChanged = async (next, previous, generation, reason) => {
     await bgEnsureRegisteredUserScopeBoundary(next, reason || "license-scope-changed");
     return true
@@ -9534,6 +9688,7 @@ async function bgMaybeApplyCloudConfig(e, t = "alarm", r = !1, options = null) {
     return c
 }
 async function bgRequestCloudAutosync(e = "autosync", t = !1) {
+    if (typeof globalThis.TeamsHelperRuntimeSignedInForPresence === "function" && !(await globalThis.TeamsHelperRuntimeSignedInForPresence(e || "autosync"))) return bgBuildLockedStateResponse("extension-signed-out");
     if (!(await bgHasRuntimeEntitlement(false))) return bgBuildLockedStateResponse("runtime-access-required");
     if (!globalThis.TeamsHelperLicense || "function" != typeof globalThis.TeamsHelperLicense.fetchRuntimeConfig) return bgBuildStateResponse(!1);
     const settings = await bgGetCloudPollSettings();
@@ -11072,10 +11227,36 @@ function bgScheduleObservedAccountInventoryReconcile(reason = "teams-account-coo
     }, 350)
 }
 
+let bgTeamsWebSessionLogoutCheckTimer = null;
+function bgScheduleTeamsWebSessionLogoutCheck(reason = "microsoft-account-cookie-removed") {
+    if (bgTeamsWebSessionLogoutCheckTimer) clearTimeout(bgTeamsWebSessionLogoutCheckTimer);
+    bgTeamsWebSessionLogoutCheckTimer = setTimeout(() => {
+        bgTeamsWebSessionLogoutCheckTimer = null;
+        Promise.resolve(bgReadTeamsCookieAccountInventory(reason).catch(error => ({ ok: false, complete: false, error: String(error && (error.message || error.msg) || error), accountCount: 0, cookieCount: 0 })))
+            .then(async inventory => {
+                const complete = !!(inventory && inventory.ok && inventory.complete !== false);
+                const hasTeamsSession = !!(inventory && (Number(inventory.accountCount || 0) > 0 || Number(inventory.cookieCount || 0) > 0));
+                if (!complete || hasTeamsSession) {
+                    try { if (hasTeamsSession) globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ = false; } catch {}
+                    return;
+                }
+                await bgTeardownTeamsWebSessionRuntime("teams-web-session-cookie-logout").catch(() => null);
+                await bgScheduleStatusLog("info", "Teams web session cookies are gone; stopped background Teams transports", {
+                    reason: String(reason || "microsoft-account-cookie-removed"),
+                    accountCount: Number(inventory && inventory.accountCount || 0),
+                    cookieCount: Number(inventory && inventory.cookieCount || 0)
+                }).catch(() => null);
+            })
+            .catch(() => null);
+    }, 350)
+}
+
 try {
     if (chrome.cookies && chrome.cookies.onChanged) {
         chrome.cookies.onChanged.addListener(changeInfo => {
             if (!bgMicrosoftCookieMayAffectTeamsAccounts(changeInfo)) return;
+            if (changeInfo && changeInfo.removed) bgScheduleTeamsWebSessionLogoutCheck("microsoft-account-cookie-removed");
+            else { try { globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ = false; } catch {} }
             bgScheduleObservedAccountInventoryReconcile("microsoft-account-cookie-change");
         });
     }
@@ -17662,6 +17843,7 @@ function bgTeamsHelperCanStoreLocalKeepalive(config, sender) {
 
 async function bgHandleScheduleAlarm(reason) {
   th147MarkScheduleEditPayload(arguments && arguments[0], "schedule-function-entry");
+    if (typeof globalThis.TeamsHelperRuntimeSignedInForPresence === "function" && !(await globalThis.TeamsHelperRuntimeSignedInForPresence(reason || "schedule-alarm"))) return { ok: true, skipped: true, reason: "extension-signed-out" };
     const startedAt = Date.now();
     if (!(await bgHasRuntimeEntitlement(false))) {
         await bgForgetPacketExecutor("runtime-access-required").catch(() => null);
@@ -18255,6 +18437,8 @@ async function thGetAnyOffscreenContexts(){
 }
 async function thEnsurePersistentOffscreen(){
  try{
+  if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true))return false;
+  if(typeof globalThis.TeamsHelperRuntimeSignedInForPresence==='function'&&!(await globalThis.TeamsHelperRuntimeSignedInForPresence('keepalive-offscreen')))return false;
   if(!chrome.offscreen||!chrome.offscreen.createDocument)return false;
   const existing=await thGetAnyOffscreenContexts();
   if(existing&&existing.length>0)return true;
@@ -18283,8 +18467,8 @@ try{globalThis.thEnsurePersistentOffscreen=thEnsurePersistentOffscreen}catch{}
 try{thEnsurePersistentOffscreen()}catch{}
 try{chrome.runtime.onStartup.addListener(()=>{thEnsurePersistentOffscreen().catch(()=>{})})}catch{}
 try{chrome.runtime.onInstalled.addListener(()=>{thEnsurePersistentOffscreen().catch(()=>{})})}catch{}
-try{chrome.alarms.create(TH_KEEPALIVE_ALARM,{periodInMinutes:1})}catch{}
-try{chrome.alarms.onAlarm.addListener((a)=>{if(a&&a.name===TH_KEEPALIVE_ALARM){thEnsurePersistentOffscreen().catch(()=>{});try{void bgDurableRuntimeStorage().get(['th_keepalive_touch']).catch(()=>{})}catch{}}})}catch{}
+try{Promise.resolve(typeof globalThis.TeamsHelperRuntimeSignedInForPresence==='function'?globalThis.TeamsHelperRuntimeSignedInForPresence('keepalive-alarm-install'):true).then(ok=>{try{if(ok)chrome.alarms.create(TH_KEEPALIVE_ALARM,{periodInMinutes:1});else chrome.alarms.clear(TH_KEEPALIVE_ALARM)}catch{}})}catch{}
+try{chrome.alarms.onAlarm.addListener((a)=>{if(a&&a.name===TH_KEEPALIVE_ALARM){Promise.resolve(typeof globalThis.TeamsHelperRuntimeSignedInForPresence==='function'?globalThis.TeamsHelperRuntimeSignedInForPresence('keepalive-alarm'):true).then(ok=>{if(!ok){try{chrome.alarms.clear(TH_KEEPALIVE_ALARM)}catch{};return}thEnsurePersistentOffscreen().catch(()=>{});try{void bgDurableRuntimeStorage().get(['th_keepalive_touch']).catch(()=>{})}catch{}}).catch(()=>{})}})}catch{}
 try{chrome.runtime.onConnect.addListener((port)=>{
  if(!port||port.name!=='teams-helper-keepalive')return;
  port.onMessage.addListener((msg)=>{
@@ -18376,6 +18560,7 @@ async function thRunThirtySecondStatusReassert(source){
  const reason='thirty-second-status-reassert-'+String(source||'timer');
  if(thStatusReassertInFlight)return thStatusReassertInFlight;
  thStatusReassertInFlight=(async()=>{
+  if(typeof globalThis.TeamsHelperRuntimeSignedInForPresence==='function'&&!(await globalThis.TeamsHelperRuntimeSignedInForPresence(reason))){try{chrome.alarms.clear(TH_STATUS_REASSERT_ALARM)}catch{};return {ok:true,skipped:true,reason:'extension-signed-out',trigger:reason}}
   try{await bgDurableRuntimeStorage().set({[TH_STATUS_REASSERT_TOUCH]:Date.now(),th_status_reassert_source:String(source||'timer')})}catch{}
   const state=await m().catch(()=>null);
   const normalized=h(state||null,state&&state.tabId);
@@ -18416,7 +18601,7 @@ async function thRunThirtySecondStatusReassert(source){
  return thStatusReassertInFlight;
 }
 function thInstallThirtySecondStatusLoop(){
- try{chrome.alarms.create(TH_STATUS_REASSERT_ALARM,{delayInMinutes:1,periodInMinutes:1})}catch{}
+ try{Promise.resolve(typeof globalThis.TeamsHelperRuntimeSignedInForPresence==='function'?globalThis.TeamsHelperRuntimeSignedInForPresence('status-reassert-alarm-install'):true).then(ok=>{try{if(ok)chrome.alarms.create(TH_STATUS_REASSERT_ALARM,{delayInMinutes:1,periodInMinutes:1});else chrome.alarms.clear(TH_STATUS_REASSERT_ALARM)}catch{}})}catch{}
  // MV3 alarms are the single periodic owner. A parallel service-worker interval
  // used to fire immediately beside the alarm and start a second full presence
  // transaction after the first one completed.
@@ -19158,12 +19343,13 @@ async function th216EnsureAugLoopSession(state,bundle,manager,reason='presence-s
  const docSessionId=th216Uuid(),sessionId=th216Text(bundle&&bundle.sessionId||'').trim()||th216Uuid(),cvRoot=th216Uuid().replace(/-/g,'').slice(0,22);
  const entry={socket,url,state:th216Normalize(state||{}),bundle,manager,accessToken:token,tokenRejected:false,tokenRefreshRequired:false,authRefreshQueued:false,openedAt:0,readyAt:0,lastMessageAt:0,lastPingAt:0,lastPongAt:0,initialized:false,provisioned:false,sessionKey:'',sliceUrl:'',docSessionId,sessionId,cvRoot,heartbeatTimer:null,reconnectTimer:null,intentionalClose:false,contextInstalled:!!(context&&context.ok)};
  th216AugLoopSessions.set(key,entry);
- const sendRaw=value=>{try{if(socket.readyState!==WebSocket.OPEN)return false;socket.send(typeof value==='string'?value:JSON.stringify(value));return true}catch{return false}};
+ const sendRaw=value=>{try{if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;try{socket.close(1000,'extension-signed-out')}catch{};return false}if(socket.readyState!==WebSocket.OPEN)return false;socket.send(typeof value==='string'?value:JSON.stringify(value));return true}catch{return false}};
  const sendResponse=messageId=>sendRaw({H_:th216AugLoopType('AugLoop_Session_Protocol_Response',[]),messageId:String(messageId||'')});
  const sendSeed=()=>sendRaw({cv:cvRoot+'.2',seq:0,ops:[{parentPath:['session'],items:[{id:'documentRoot',body:{isReadonly:false,H_:th216AugLoopType('AugLoop_Core_Document',['AugLoop_Core_TileGroup'])}}],H_:th216AugLoopType('AugLoop_Core_AddOperation',['AugLoop_Core_OperationWithSiblingContext','AugLoop_Core_Operation'])}],groupId:'Seed',groupSize:1,groupComplete:true,H_:th216AugLoopType('AugLoop_Session_Protocol_SyncMessage',['AugLoop_Session_Protocol_Message']),messageId:'c2'});
  const sendToken=()=>sendRaw({authToken:token,version:1,H_:th216AugLoopType('AugLoop_Session_Protocol_TokenProvisionMessage',['AugLoop_Session_Protocol_Message']),cv:cvRoot+'.3',messageId:'c3'});
  const sendInit=()=>sendRaw({protocolVersion:2,clientMetadata:th216AugLoopClientMetadata(state,sessionId,docSessionId),extensionConfigs:[],returnWorkflowInputTypes:true,enableRemoteExecutionNotification:false,createBlobStorageContainer:false,H_:th216AugLoopType('AugLoop_Session_Protocol_SessionInitMessage',['AugLoop_Session_Protocol_Message']),cv:cvRoot+'.1',messageId:'c1'});
  const scheduleReconnect=()=>{
+  if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;return}
   if(entry.intentionalClose||entry.reconnectTimer)return;
   if(entry.tokenRejected||entry.tokenRefreshRequired||!th216AugLoopTokenFresh(entry.bundle)){
    if(!entry.authRefreshQueued&&typeof bgRunPresenceForceNow==='function'){
@@ -19214,7 +19400,7 @@ async function th216EnsureAugLoopSession(state,bundle,manager,reason='presence-s
   const current=th216AugLoopSessions.get(key);if(current===entry)th216AugLoopSessions.delete(key);
   try{th216OrderedFlowLog(manager,13.5,'augloop-session',phase,{reason:'augloop-websocket-'+phase,closeCode:event&&Number(event.code)||'not-applicable',closeReason:th216SafeText(event&&event.reason||'',160),initialized:entry.initialized,provisioned:entry.provisioned})}catch{}
   scheduleReconnect();
-  if(!entry.intentionalClose)try{bgQueueAssignedStatusAutoSessionRepair('account-augloop-'+phase,750,entry.state)}catch{}
+  if(!entry.intentionalClose&&globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__!==true&&globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__!==true)try{bgQueueAssignedStatusAutoSessionRepair('account-augloop-'+phase,750,entry.state)}catch{}
  };
  socket.addEventListener('error',event=>cleanup('error',event),{once:true});
  socket.addEventListener('close',event=>cleanup('close',event),{once:true});
@@ -19225,6 +19411,7 @@ async function th216EnsureAugLoopSession(state,bundle,manager,reason='presence-s
   const ready=await Promise.race([readyPromise,new Promise(resolve=>setTimeout(()=>resolve(false),15000))]);
   if(!ready){entry.intentionalClose=true;try{socket.close(4000,'session-init-timeout')}catch{};return {ok:false,status:101,url,reason:'augloop-session-not-ready'}}
   entry.heartbeatTimer=setInterval(()=>{
+   if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;try{clearInterval(entry.heartbeatTimer)}catch{};try{socket.close(1000,'extension-signed-out')}catch{};return}
    const current=th216AugLoopSessions.get(key);if(current!==entry||socket.readyState!==WebSocket.OPEN){try{clearInterval(entry.heartbeatTimer)}catch{};return}
    const currentTime=Date.now();
    if(Number(entry.tokenExpiresAt||0)&&Number(entry.tokenExpiresAt)<=currentTime+120000){entry.tokenRefreshRequired=true;try{socket.close(4001,'augloop-token-expiring')}catch{};return}
@@ -19302,7 +19489,7 @@ async function th216OpenTrouterRegistrationChannel(state,endpointId,sessionId,re
   socket.binaryType='arraybuffer';
   const entry={socket,path:'',url,at:Date.now(),pathPromise,authenticationPromise,discovery,discoveryJson,endpointId,sessionId,state:th216Normalize(state||{}),bundle:null,manager,profile,heartbeatTimer:null,presenceActivityTimer:null,endpointLeaseTimer:null,endpointLeaseRetryTimer:null,registrarRenewTimer:null,reconnectTimer:null,intentionalClose:false,cleanupHandled:false,authenticated:false,connectedAt:0,lastMessageAt:0,lastPongAt:0,lastPingAt:0,lastDeliveryAt:0,lastActivityAt:0,lastActivityState:'',lastObservedAvailability:'',registrarRegisteredAt:0,endpointLeaseRefreshedAt:0};
   th216TrouterSockets.set(key,entry);
-  const sendRaw=value=>{try{if(socket.readyState!==WebSocket.OPEN)return false;socket.send(String(value));return true}catch{return false}};
+  const sendRaw=value=>{try{if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;try{socket.close(1000,'extension-signed-out')}catch{};return false}if(socket.readyState!==WebSocket.OPEN)return false;socket.send(String(value));return true}catch{return false}};
   const sendEphemeral=payload=>sendRaw('5:::'+JSON.stringify(payload));
   const sendCommand=payload=>sendRaw('5:'+(commandCount++)+'+::'+JSON.stringify(payload));
   const sendPing=()=>{const sent=sendCommand({name:'ping'});if(sent)entry.lastPingAt=Date.now();return sent};
@@ -19392,7 +19579,7 @@ async function th216OpenTrouterRegistrationChannel(state,endpointId,sessionId,re
     th216TrouterSockets.delete(key)
    }
    try{th216OrderedFlowLog(manager,11,'trouter-skype-channel',phase,{reason:phase==='close'?'trouter-websocket-closed-after-open':'trouter-websocket-error-after-open',closeCode:event&&Number(event.code)||'not-applicable',closeReason:th216SafeText(event&&event.reason||'',160),pathAvailable:!!entry.path,accountScopedRepairQueued:!entry.intentionalClose})}catch{}
-   if(!entry.intentionalClose){
+   if(!entry.intentionalClose&&globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__!==true&&globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__!==true){
     entry.reconnectTimer=setTimeout(()=>{try{bgQueueAssignedStatusAutoSessionRepair('personal-trouter-'+phase,0,entry.state)}catch{}},250)
    }
   };
@@ -19409,6 +19596,7 @@ async function th216OpenTrouterRegistrationChannel(state,endpointId,sessionId,re
   const authenticated=await Promise.race([authenticationPromise,new Promise(resolve=>setTimeout(()=>resolve(false),15000))]);
   if(!authenticated||!entry.path){try{socket.close(1000,'authentication-not-confirmed')}catch{};return {ok:false,status:null,path:'',url,reason:'trouter-channel-authentication-not-confirmed',discoveryStatus:discovery&&discovery.status==null?null:discovery.status}}
   entry.heartbeatTimer=setInterval(()=>{
+   if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;try{clearInterval(entry.heartbeatTimer)}catch{};try{socket.close(1000,'extension-signed-out')}catch{};return}
    const current=th216TrouterSockets.get(key);
    if(!current||current!==entry||socket.readyState!==WebSocket.OPEN){try{clearInterval(entry.heartbeatTimer)}catch{};return}
    const currentTime=Date.now();
@@ -19417,6 +19605,7 @@ async function th216OpenTrouterRegistrationChannel(state,endpointId,sessionId,re
    try{th216OrderedFlowLog(manager,11,'trouter-skype-channel','heartbeat',{reason:'trouter-protocol-ping',sent,lastPongAgeMs:Math.max(0,currentTime-Number(entry.lastPongAt||entry.connectedAt||currentTime))})}catch{}
   },25000);
   entry.presenceActivityTimer=setInterval(()=>{
+   if((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__===true||globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__===true)){entry.intentionalClose=true;try{clearInterval(entry.presenceActivityTimer)}catch{};try{socket.close(1000,'extension-signed-out')}catch{};return}
    const current=th216TrouterSockets.get(key);
    if(!current||current!==entry||socket.readyState!==WebSocket.OPEN){try{clearInterval(entry.presenceActivityTimer)}catch{};return}
    const activityState=desiredActivityState();
@@ -20875,7 +21064,7 @@ async function th37322OpenBusinessTrouter(state, endpointId, sessionId, manager,
       registrarRegisteredAt: 0, endpointLeaseRefreshedAt: 0, registrarDue: false
     };
     th216TrouterSockets.set(key, entry);
-    const sendRaw = value => { try { if (socket.readyState !== WebSocket.OPEN) return false; socket.send(String(value)); return true; } catch { return false; } };
+    const sendRaw = value => { try { if ((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ === true || globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ === true)) { entry.intentionalClose = true; try { socket.close(1000, 'extension-signed-out'); } catch {} return false; } if (socket.readyState !== WebSocket.OPEN) return false; socket.send(String(value)); return true; } catch { return false; } };
     const sendEphemeral = payload => sendRaw('5:::' + JSON.stringify(payload));
     const sendCommand = payload => sendRaw(`5:${commandCount++}+::${JSON.stringify(payload)}`);
     const sendPing = () => { const sent = sendCommand({ name: 'ping' }); if (sent) entry.lastPingAt = Date.now(); return sent; };
@@ -20990,7 +21179,7 @@ async function th37322OpenBusinessTrouter(state, endpointId, sessionId, manager,
           accountScopedRepairQueued: !entry.intentionalClose
         });
       } catch {}
-      if (!entry.intentionalClose) {
+      if (!entry.intentionalClose && globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ !== true && globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ !== true) {
         entry.reconnectTimer = setTimeout(() => { try { bgQueueAssignedStatusAutoSessionRepair('business-trouter-' + phase, 0, entry.state); } catch {} }, 250);
       }
     };
@@ -21010,6 +21199,7 @@ async function th37322OpenBusinessTrouter(state, endpointId, sessionId, manager,
       return { ok: false, status: null, path: '', url, reason: 'business-trouter-authentication-not-confirmed' };
     }
     entry.heartbeatTimer = setInterval(() => {
+      if ((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ === true || globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ === true)) { entry.intentionalClose = true; try { clearInterval(entry.heartbeatTimer); } catch {} try { socket.close(1000, 'extension-signed-out'); } catch {} return; }
       const current = th216TrouterSockets.get(key);
       if (!current || current !== entry || socket.readyState !== WebSocket.OPEN) {
         try { clearInterval(entry.heartbeatTimer); } catch {}
@@ -21023,6 +21213,7 @@ async function th37322OpenBusinessTrouter(state, endpointId, sessionId, manager,
       sendPing();
     }, 25000);
     entry.presenceActivityTimer = setInterval(() => {
+      if ((globalThis.__TEAMS_HELPER_RUNTIME_SIGNED_OUT__ === true || globalThis.__TEAMS_HELPER_TEAMS_WEB_SESSION_OFFLINE__ === true)) { entry.intentionalClose = true; try { clearInterval(entry.presenceActivityTimer); } catch {} try { socket.close(1000, 'extension-signed-out'); } catch {} return; }
       const current = th216TrouterSockets.get(key);
       if (!current || current !== entry || socket.readyState !== WebSocket.OPEN) {
         try { clearInterval(entry.presenceActivityTimer); } catch {}
@@ -23107,6 +23298,10 @@ const TablessSessionMaintainer = (() => {
 
       inFlight = (async () => {
         const reason = "tabless-session-maintainer-" + reasonSlug(source);
+        if (typeof globalThis.TeamsHelperRuntimeSignedInForPresence === "function" && !(await globalThis.TeamsHelperRuntimeSignedInForPresence(reason))) {
+          try { if (chrome.alarms && chrome.alarms.clear) await chrome.alarms.clear(ALARM_NAME).catch(() => null); } catch {}
+          return { ok: true, skipped: true, reason: "extension-signed-out", source };
+        }
 
         await storageSet({
           th_tabless_session_last_tick_at: now(),
@@ -23183,7 +23378,9 @@ const TablessSessionMaintainer = (() => {
       } catch {}
 
       try {
-        chrome.alarms.create(ALARM_NAME, { delayInMinutes: 1, periodInMinutes: 1 });
+        Promise.resolve(typeof globalThis.TeamsHelperRuntimeSignedInForPresence === "function" ? globalThis.TeamsHelperRuntimeSignedInForPresence("tabless-session-alarm-install") : true)
+          .then(ok => { try { if (ok) chrome.alarms.create(ALARM_NAME, { delayInMinutes: 1, periodInMinutes: 1 }); else chrome.alarms.clear(ALARM_NAME); } catch {} })
+          .catch(() => null);
       } catch {}
 
       try {

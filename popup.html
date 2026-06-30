@@ -183,8 +183,8 @@
 <div class="editor-grid">
 <label class="field"><span>Account</span><select id="accountField"><option value="">No account</option></select></label>
 <label class="field"><span>Status</span><select id="statusField"><option value="available">Available</option><option value="busy">Busy</option><option value="dnd">Do not disturb</option><option value="brb">Be right back</option><option value="away">Away</option><option value="offline">Appear offline</option></select></label>
-<label class="field field-time"><span>Start</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" id="startFieldButton" type="button"><span class="time-field-value" id="startFieldDisplay">09:00 AM</span><span class="time-field-action">Choose</span></button><input aria-hidden="true" class="time-value-input" id="startField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
-<label class="field field-time"><span>End</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" id="endFieldButton" type="button"><span class="time-field-value" id="endFieldDisplay">10:00 AM</span><span class="time-field-action">Choose</span></button><input aria-hidden="true" class="time-value-input" id="endField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
+<label class="field field-time"><span>Start</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" disabled="" id="startFieldButton" type="button"><span class="time-field-value" id="startFieldDisplay">09:00 AM</span></button><input aria-hidden="true" class="time-value-input" id="startField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
+<label class="field field-time"><span>End</span><button aria-expanded="false" aria-haspopup="dialog" class="time-field-button" disabled="" id="endFieldButton" type="button"><span class="time-field-value" id="endFieldDisplay">10:00 AM</span></button><input aria-hidden="true" class="time-value-input" id="endField" max="23:59" min="00:00" step="60" tabindex="-1" type="time"/></label>
 <label class="field"><div class="field-head"><span>Priority</span><strong id="priorityValue">0</strong></div><input id="priorityField" max="50" min="0" step="1" type="range" value="0"/></label>
 <label class="check-field"><input id="callsField" type="checkbox"/> Allow during calls</label>
 <label class="field full"><span>Note</span><input id="noteField" maxlength="80" placeholder="Optional note" type="text"/></label>
@@ -322,7 +322,6 @@
 <section class="time-picker-column"><span class="time-picker-column-title">Minute</span><div class="time-picker-scroll-host"><div class="time-picker-scroll" id="timePickerMinutes" role="listbox"></div></div></section>
 <section class="time-picker-column time-picker-meridiem"><span class="time-picker-column-title">Period</span><div class="time-picker-scroll-host"><div class="time-picker-scroll" id="timePickerMeridiem" role="listbox"></div></div></section>
 </div>
-<div class="time-picker-hint">Click outside to apply · Esc to cancel</div>
 </div>
 </div>
 <script src="popup.js"></script>

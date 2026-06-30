@@ -1865,7 +1865,12 @@
     if (revealEditor && refs.editorPanel && state.selectedBlock) refs.editorPanel.open = true;
   }
   function setEditorDisabled(disabled) {
-    [refs.accountField, refs.statusField, refs.startField, refs.endField, refs.priorityField, refs.callsField, refs.noteField, refs.deleteBtn, refs.startFieldButton, refs.endFieldButton].forEach(control => { if (control) control.disabled = !!disabled; });
+    const isDisabled = !!disabled;
+    [refs.accountField, refs.statusField, refs.startField, refs.endField, refs.priorityField, refs.callsField, refs.noteField, refs.deleteBtn, refs.startFieldButton, refs.endFieldButton].forEach(control => {
+      if (!control) return;
+      control.disabled = isDisabled;
+      if (control === refs.startFieldButton || control === refs.endFieldButton) control.setAttribute('aria-disabled', String(isDisabled));
+    });
     if (disabled && state.timePickerField) closeTimePicker();
   }
   function syncPriorityReadout() {
@@ -1999,6 +2004,10 @@
   function openTimePicker(fieldId) {
     const field = refs[fieldId];
     const button = timeFieldButtonFor(fieldId);
+    if (!selectedBlockData()) {
+      if (state.timePickerField) closeTimePicker();
+      return;
+    }
     if (!field || !button || field.disabled || button.disabled) return;
     if (state.timePickerField && state.timePickerField !== fieldId) closeTimePicker();
     if (state.timePickerField === fieldId && refs.timePicker && !refs.timePicker.hidden) {
