@@ -22,7 +22,7 @@ Core capabilities included in this package:
 ## Project details
 
 - Extension name: Teams Helper
-- Version: 3.74.40
+- Version: 3.74.41
 - Manifest version: 3
 - Minimum Chrome version: 116
 - Browser target: Chrome and Microsoft Edge
